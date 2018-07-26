@@ -1,5 +1,25 @@
 pragma solidity ^0.4.24;
 
+contract IGame {
+  function bet(uint8 _answer) external returns (uint8 res);
+  
+  function seeMyScore() external view returns (uint res);
+  
+  function seeMyPartnerAnswer(uint id) public view returns (uint8);
+  
+  function seeMyQofGames() public view returns (uint);
+  
+  function seeMyAnswer(uint _qGame) public view returns (uint8);
+  
+  function seeMyAnswers() public view returns (uint8[9]);
+  
+  function seeMyPartners() public view returns (address[9]);
+  
+  function seeMyIds() public view returns (uint[9]);
+  
+  function seeMyId(uint _qGame) public view returns (uint);
+}
+
 contract Game {
   
   uint8 constant DONT_TELL_ANYTHING = 8;
@@ -25,18 +45,20 @@ contract Game {
     uint8 [9] answer;
     address [9] partner;
     uint8 [9] gameStatus;
+    mapping(uint => uint8) partnerRes;
+    uint [9] gameIds;
   }
   
   mapping(address => Stats) stats;
   
-  function bet(uint8 _answer) returns (uint8 res) {
+  function bet(uint8 _answer) external returns (uint8 res) {
     require(stats[msg.sender].gameStatus[stats[msg.sender].qOfGames] != OPENED);
     stats[msg.sender].answer[stats[msg.sender].qOfGames] = _answer;
     stats[msg.sender].gameStatus[stats[msg.sender].qOfGames] = OPENED;
     res = play(msg.sender);
   }
   
-  function play(address _player) returns (uint8) {
+  function play(address _player) private returns (uint8) {
     
     currentPlayers.push(_player);
     len++;
@@ -57,14 +79,17 @@ contract Game {
       stats[pTwo].partner[stats[pTwo].qOfGames] = pOne;
       stats[pOne].gameStatus[stats[pOne].qOfGames] = CLOSED;
       stats[pTwo].gameStatus[stats[pTwo].qOfGames] = CLOSED;
+      stats[pTwo].gameIds[stats[pTwo].qOfGames] = block.timestamp;
+      stats[pOne].gameIds[stats[pTwo].qOfGames] = block.timestamp;
+      stats[pTwo].partnerRes[stats[pTwo].gameIds[stats[pTwo].qOfGames]] = _resOne;
+      stats[pOne].partnerRes[stats[pOne].gameIds[stats[pOne].qOfGames]] = _resTwo;
       stats[pOne].qOfGames += 1;
       stats[pTwo].qOfGames += 1;
-      
       return DONE;
     }
   }
   
-  function calcResOfGame(uint8 _resOne, uint8 _resTwo) pure returns (uint8) {
+  function calcResOfGame(uint8 _resOne, uint8 _resTwo) private pure returns (uint8) {
     if (_resOne == DONT_TELL_ANYTHING && _resTwo == DONT_TELL_ANYTHING) {
       return RESULT_HALF_HALF;
     }
@@ -76,33 +101,6 @@ contract Game {
     }
     else if (_resOne == TELL_EVERYTHING && _resTwo == TELL_EVERYTHING) {
       return RESULT_TWO_TWO;
-    }
-  }
-  
-  function calcMyFinalRes() view returns (uint res) {
-    for (uint i = 0; i <= stats[msg.sender].qOfGames; i++) {
-      if (stats[msg.sender].results[i] == RESULT_HALF_HALF) {
-        res += 1;
-      }
-      if (stats[msg.sender].results[i] == RESULT_ZERO_TEN) {
-        if (stats[msg.sender].answer[i] == TELL_EVERYTHING) {
-          res += 0;
-        }
-        else {
-          res += 10;
-        }
-      }
-      if (stats[msg.sender].results[i] == RESULT_TEN_ZERO) {
-        if (stats[msg.sender].answer[i] == TELL_EVERYTHING) {
-          res += 0;
-        }
-        else {
-          res += 10;
-        }
-      }
-      if (stats[msg.sender].results[i] == RESULT_TWO_TWO) {
-        res += 2;
-      }
     }
   }
   
@@ -133,10 +131,8 @@ contract Game {
     }
   }
   
-  function seeMyPartnerAnswer(uint _qGame) public view returns (uint8) {
-    require(_qGame <= 9);
-    address partner = stats[msg.sender].partner[_qGame];
-    return stats[partner].answer[_qGame];
+  function seeMyPartnerAnswer(uint id) public view returns (uint8) {
+    return stats[msg.sender].partnerRes[id];
   }
   
   function seeMyQofGames() public view returns (uint) {
@@ -146,6 +142,22 @@ contract Game {
   function seeMyAnswer(uint _qGame) public view returns (uint8) {
     require(_qGame <= 9);
     return stats[msg.sender].answer[_qGame];
+  }
+  
+  function seeMyAnswers() public view returns (uint8[9]) {
+    return stats[msg.sender].answer;
+  }
+  
+  function seeMyPartners() public view returns (address[9]) {
+    return stats[msg.sender].partner;
+  }
+  
+  function seeMyIds() public view returns (uint[9]) {
+    return stats[msg.sender].gameIds;
+  }
+  
+  function seeMyId(uint _qGame) public view returns (uint) {
+    return stats[msg.sender].gameIds[_qGame];
   }
   
 }
