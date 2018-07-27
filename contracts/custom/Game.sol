@@ -1,23 +1,42 @@
 pragma solidity ^0.4.24;
 
 contract IGame {
+  
+  uint8 constant DONT_TELL_ANYTHING = 8;
+  uint8 constant TELL_EVERYTHING = 10;
+  
   function bet(uint8 _answer) external returns (uint8 res);
   
-  function seeMyScore() external view returns (uint res);
+  function seeMyScore(address _t) external view returns (uint res);
   
-  function seeMyPartnerAnswer(uint id) public view returns (uint8);
+  function seeMyPartnerAnswer(uint id, address _t) public view returns (uint8);
   
-  function seeMyQofGames() public view returns (uint);
+  function seeMyQofGames(address _t) public view returns (uint);
   
-  function seeMyAnswer(uint _qGame) public view returns (uint8);
+  function seeMyAnswer(uint _qGame, address _t) public view returns (uint8);
   
-  function seeMyAnswers() public view returns (uint8[9]);
+  function seeMyAnswers(address _t) public view returns (uint8[9]);
   
-  function seeMyPartners() public view returns (address[9]);
+  function seeMyPartners(address _t) public view returns (address[9]);
   
-  function seeMyIds() public view returns (uint[9]);
+  function seeMyIds(address _t) public view returns (uint[9]);
   
-  function seeMyId(uint _qGame) public view returns (uint);
+  function seeMyId(uint _qGame, address _t) public view returns (uint);
+}
+
+contract Player {
+  
+  address target;
+  
+  constructor(address _target) {
+    target = _target;
+  }
+  
+  function setBet() {
+    IGame I = IGame(target);
+    I.bet(0x8);
+  }
+  
 }
 
 contract Game {
@@ -39,6 +58,10 @@ contract Game {
   address []currentPlayers;
   uint256 len;
   
+  uint8 currentMatchingStatus;
+  
+  uint time;
+  
   struct Stats {
     uint256 qOfGames;
     uint8 [9] results;
@@ -58,16 +81,26 @@ contract Game {
     res = play(msg.sender);
   }
   
+  function timeout() private {
+    time = block.timestamp + 10;
+  }
+  
   function play(address _player) private returns (uint8) {
+    require(block.timestamp >= time, "please, wait a bit");
+    timeout();
     
     currentPlayers.push(_player);
     len++;
     
-    if (len % 2 != 0) {
-      return IN_PROGRESS;
+    if (len == 1) {
+      currentMatchingStatus = IN_PROGRESS;
+      return currentMatchingStatus;
     }
-    
-    if (len % 2 == 0) {
+    else if (len % 2 != 0 && currentMatchingStatus == DONE) {
+      currentMatchingStatus = IN_PROGRESS;
+      return currentMatchingStatus;
+    }
+    else if (len % 2 == 0 && currentMatchingStatus == IN_PROGRESS) {
       address pOne = currentPlayers[len - 2];
       address pTwo = currentPlayers[len - 1];
       uint8 _resOne = stats[pOne].answer[stats[pOne].qOfGames];
@@ -85,7 +118,11 @@ contract Game {
       stats[pOne].partnerRes[stats[pOne].gameIds[stats[pOne].qOfGames]] = _resTwo;
       stats[pOne].qOfGames += 1;
       stats[pTwo].qOfGames += 1;
-      return DONE;
+      currentMatchingStatus = DONE;
+      return currentMatchingStatus;
+    }
+    else {
+      play(_player);
     }
   }
   
@@ -104,13 +141,13 @@ contract Game {
     }
   }
   
-  function seeMyScore() external view returns (uint res) {
+  function seeMyScore(address _t) external view returns (uint res) {
     for (uint i = 0; i <= stats[msg.sender].qOfGames; i++) {
-      if (stats[msg.sender].results[i] == RESULT_HALF_HALF) {
+      if (stats[_t].results[i] == RESULT_HALF_HALF) {
         res += 1;
       }
       if (stats[msg.sender].results[i] == RESULT_ZERO_TEN) {
-        if (stats[msg.sender].answer[i] == TELL_EVERYTHING) {
+        if (stats[_t].answer[i] == TELL_EVERYTHING) {
           res += 0;
         }
         else {
@@ -118,46 +155,46 @@ contract Game {
         }
       }
       if (stats[msg.sender].results[i] == RESULT_TEN_ZERO) {
-        if (stats[msg.sender].answer[i] == TELL_EVERYTHING) {
+        if (stats[_t].answer[i] == TELL_EVERYTHING) {
           res += 0;
         }
         else {
           res += 10;
         }
       }
-      if (stats[msg.sender].results[i] == RESULT_TWO_TWO) {
+      if (stats[_t].results[i] == RESULT_TWO_TWO) {
         res += 2;
       }
     }
   }
   
-  function seeMyPartnerAnswer(uint id) public view returns (uint8) {
-    return stats[msg.sender].partnerRes[id];
+  function seeMyPartnerAnswer(uint id, address _t) public view returns (uint8) {
+    return stats[_t].partnerRes[id];
   }
   
-  function seeMyQofGames() public view returns (uint) {
-    return stats[msg.sender].qOfGames;
+  function seeMyQofGames(address _t) public view returns (uint) {
+    return stats[_t].qOfGames;
   }
   
-  function seeMyAnswer(uint _qGame) public view returns (uint8) {
+  function seeMyAnswer(uint _qGame, address _t) public view returns (uint8) {
     require(_qGame <= 9);
-    return stats[msg.sender].answer[_qGame];
+    return stats[_t].answer[_qGame];
   }
   
-  function seeMyAnswers() public view returns (uint8[9]) {
-    return stats[msg.sender].answer;
+  function seeMyAnswers(address _t) public view returns (uint8[9]) {
+    return stats[_t].answer;
   }
   
   function seeMyPartners() public view returns (address[9]) {
     return stats[msg.sender].partner;
   }
   
-  function seeMyIds() public view returns (uint[9]) {
-    return stats[msg.sender].gameIds;
+  function seeMyIds(address _t) public view returns (uint[9]) {
+    return stats[_t].gameIds;
   }
   
-  function seeMyId(uint _qGame) public view returns (uint) {
-    return stats[msg.sender].gameIds[_qGame];
+  function seeMyId(uint _qGame, address _t) public view returns (uint) {
+    return stats[_t].gameIds[_qGame];
   }
   
 }
